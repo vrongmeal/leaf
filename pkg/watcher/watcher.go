@@ -16,6 +16,8 @@ type Watcher struct {
 	root  string
 	paths []string
 
+	*filterCollection
+
 	notifier *fsnotify.Watcher
 
 	fileFn FileFunc
@@ -28,7 +30,8 @@ type Watcher struct {
 
 // WatchOpts are the options used to configure the watcher.
 type WatchOpts struct {
-	Root string
+	Root    string
+	Filters []string
 
 	FileFn  FileFunc
 	ErrorFn ErrorFunc
@@ -43,7 +46,7 @@ func nilFileFunc(string) {}
 // ErrorFunc is the function that runs when an error occurs while watching.
 type ErrorFunc func(err error)
 
-func nilErrorFunc(error) {}
+func nilErrorFunc(err error) { logrus.Errorln(err) }
 
 // StopFunc is the function that runs when the watcher is closed.
 type StopFunc func()
@@ -68,6 +71,8 @@ func NewWatcher(opts *WatchOpts) (*Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	w.filterCollection = newFilterCollection(opts.Filters, nilErrorFunc)
 
 	if opts.FileFn == nil {
 		opts.FileFn = nilFileFunc
@@ -105,7 +110,17 @@ func (w *Watcher) Watch() error {
 			select {
 			case event := <-w.notifier.Events:
 				if event.Op == fsnotify.Write {
-					w.handleFile(event.Name)
+					file := event.Name
+					handle := false
+					if len(w.includes) == 0 || w.hasInclude(file) {
+						handle = true
+					}
+					if w.hasExclude(file) {
+						handle = false
+					}
+					if handle {
+						w.handleFile(event.Name)
+					}
 				}
 			case err := <-w.notifier.Errors:
 				if err != nil {
@@ -119,7 +134,6 @@ func (w *Watcher) Watch() error {
 	}()
 
 	for _, f := range w.paths {
-		logrus.Debugln(f)
 		if err := w.notifier.Add(f); err != nil {
 			w.done <- true
 			w.wg.Wait()
