@@ -41,7 +41,7 @@ if [ -n "$VERBOSE" ]; then
   echo "* Building with -ldflags $ldflags"
 fi
 
-GOBIN=$PWD go "${GO_CMD}" -o "${PWD}/build/${app_name}" ${GO_FLAGS} -ldflags "${ldflags}" "${repo_path}/cmd"
+GOBIN=$PWD go "${GO_CMD}" -o "${PWD}/build/${app_name}" ${GO_FLAGS} -ldflags "${ldflags}" "${repo_path}"
 
 echo "+ Build complete!"
 

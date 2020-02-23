@@ -1,4 +1,5 @@
-package main
+// Package cmd contains the command line application.
+package cmd
 
 import (
 	"fmt"
@@ -67,7 +68,8 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 }
 
-func main() {
+// Execute starts the command line tool.
+func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		logrus.Fatalf("Cannot start leaf: %s", err.Error())
 	}
