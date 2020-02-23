@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/vrongmeal/leaf/pkg/engine"
 	"github.com/vrongmeal/leaf/pkg/utils"
+	"github.com/vrongmeal/leaf/version"
 
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
@@ -41,6 +44,18 @@ order so you don't have to yourself`,
 			}
 		},
 	}
+
+	versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Leaf version",
+		Long:  `Leaf version details`,
+
+		Run: func(*cobra.Command, []string) {
+			fmt.Printf(`%s: %s
+Version [%s]
+`, version.AppName, rootCmd.Short, version.Version)
+		},
+	}
 )
 
 func init() {
@@ -48,6 +63,8 @@ func init() {
 	logrus.SetFormatter(new(prefixed.TextFormatter))
 
 	rootCmd.PersistentFlags().StringVarP(&confPath, "config", "c", utils.DefaultConfPath, "Config path for leaf configuration file")
+
+	rootCmd.AddCommand(versionCmd)
 }
 
 func main() {
