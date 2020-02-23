@@ -5,11 +5,23 @@
 ## Contents
 
 1. [Installation](#installation)
+  1. [Using `go get`](#using-go-get)
+  1. [Manual](#manual)
 1. [Usage](#usage)
-    1. [Command line help](#command-line-help)
-    1. [Configuration file](#configuration-file)
+  1. [Command line help](#command-line-help)
+  1. [Configuration file](#configuration-file)
 
 ## Installation
+
+### Using `go get`
+
+The following command will download and build Leaf in your `$GOPATH/bin`.
+
+```console
+> go get -u github.com/vrongmeal/leaf
+```
+
+### Manual
 
 1. Clone the repository and `cd` into it.
 1. Run `make build` to build the leaf as `build/leaf`.
