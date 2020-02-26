@@ -8,12 +8,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vrongmeal/leaf/pkg/commander"
-	"github.com/vrongmeal/leaf/pkg/utils"
+	"github.com/vrongmeal/leaf/pkg/types"
 	"github.com/vrongmeal/leaf/pkg/watcher"
 )
 
 // Start runs the watcher and executes the commands from the config on file change.
-func Start(conf *utils.Config) error {
+func Start(conf *types.Config) error {
 	cmdr := commander.NewCommander(conf.Exec)
 
 	opts := watcher.WatchOpts{

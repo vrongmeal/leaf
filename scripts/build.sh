@@ -12,7 +12,7 @@ app_name="leaf"
 repo_path="github.com/vrongmeal/leaf"
 
 # Get branch revision and  version
-version="1.0.1"
+version="1.1.0"
 revision=$(git rev-parse --short HEAD 2> /dev/null || echo 'unknown')
 branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null || echo 'unknown')
 

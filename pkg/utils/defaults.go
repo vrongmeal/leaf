@@ -8,11 +8,23 @@ import (
 )
 
 var (
-	// CWD is the current working directory or "."
+	// DefaultExcludePathsKeyword is used to include all default excludes.
+	DefaultExcludePathsKeyword = "DEFAULTS"
+
+	// CWD is the current working directory or ".".
 	CWD string
 
 	// DefaultConfPath is the default path for app config.
 	DefaultConfPath string
+
+	// DefaultExcludePaths are the paths that should be generally excluded
+	// while watching a project.
+	DefaultExcludePaths = []string{
+		".git/",
+		"node_modules/",
+		"vendor/",
+		"venv/",
+	}
 )
 
 func init() {

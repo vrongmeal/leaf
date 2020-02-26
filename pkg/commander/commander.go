@@ -7,27 +7,21 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/kballard/go-shellquote"
 	"github.com/sirupsen/logrus"
 )
-
-type pipeLogger struct{}
-
-func (pl pipeLogger) Write(p []byte) (int, error) {
-	fmt.Print(string(p))
-	return len(p), nil
-}
 
 // Commander is a type with multiple commands and runs them in order.
 type Commander struct {
 	index int
-	cmds  [][]string
+	cmds  []string
 	cmd   *exec.Cmd
 	kill  chan bool
 	wg    *sync.WaitGroup
 }
 
 // NewCommander returns a Commander with given commands.
-func NewCommander(cmds [][]string) *Commander {
+func NewCommander(cmds []string) *Commander {
 	return &Commander{
 		cmds:  cmds,
 		index: 0,
@@ -36,18 +30,23 @@ func NewCommander(cmds [][]string) *Commander {
 	}
 }
 
-func newCmd(cmd []string) (*exec.Cmd, error) {
-	if len(cmd) == 0 {
+func newCmd(cmd string) (*exec.Cmd, error) {
+	parsedCmd, err := shellquote.Split(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parsedCmd) == 0 {
 		return nil, fmt.Errorf("command cannot be empty")
 	}
 
 	var c *exec.Cmd
 
-	if len(cmd) == 1 {
-		c = exec.Command(cmd[0]) // nolint:gosec
+	if len(parsedCmd) == 1 {
+		c = exec.Command(parsedCmd[0]) // nolint:gosec
 	} else {
-		name := cmd[0]
-		args := cmd[1:]
+		name := parsedCmd[0]
+		args := parsedCmd[1:]
 		c = exec.Command(name, args...) // nolint:gosec
 	}
 
