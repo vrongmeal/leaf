@@ -22,6 +22,8 @@ The following command will download and build Leaf in your `$GOPATH/bin`.
 > go get -u github.com/vrongmeal/leaf
 ```
 
+**Note:** This does not build the `version` command. To build that use [manual](#manual) installation.
+
 ### Manual
 
 1. Clone the repository and `cd` into it.
