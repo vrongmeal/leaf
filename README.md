@@ -5,6 +5,7 @@
 ## Contents
 
 1. [Installation](#installation)
+    1. [Homebrew](#homebrew)
     1. [Using `go get`](#using-go-get)
     1. [Manual](#manual)
 1. [Usage](#usage)
@@ -14,6 +15,15 @@
 
 ## Installation
 
+### Homebrew
+
+You can use my homebrew tap to install Leaf.
+
+```console
+> brew tap vrongmeal/tap
+> brew install vrongmeal/tap/leaf
+```
+
 ### Using `go get`
 
 The following command will download and build Leaf in your `$GOPATH/bin`.
@@ -22,7 +32,7 @@ The following command will download and build Leaf in your `$GOPATH/bin`.
 > go get -u github.com/vrongmeal/leaf
 ```
 
-**Note:** This does not build the `version` command. To build that use [manual](#manual) installation.
+**Note:** This does not build the `version` command. To build that use [homebrew](#homebrew) or [manual](#manual) installation.
 
 ### Manual
 
