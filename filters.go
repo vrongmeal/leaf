@@ -8,8 +8,8 @@ import (
 
 // Filter can be used to Filter out watch results.
 type Filter struct {
-	include bool
-	pattern string
+	Include bool // whether to include pattern
+	Pattern string
 }
 
 // NewFilter creates a filter from the pattern string. The
@@ -27,16 +27,16 @@ func NewFilter(pattern string) (Filter, error) {
 
 	toInclude := cleanedPattern[0]
 	if toInclude == '+' {
-		f.include = true
+		f.Include = true
 	} else if toInclude == '-' {
-		f.include = false
+		f.Include = false
 	} else {
 		return f, fmt.Errorf(
 			"should have first character as '+' or '-'")
 	}
 
 	onlyPath := strings.Trim(cleanedPattern[1:], " ")
-	f.pattern, err = filepath.Abs(onlyPath)
+	f.Pattern, err = filepath.Abs(onlyPath)
 	if err != nil {
 		return f, fmt.Errorf(
 			"error making path absolute: %v", err)
@@ -47,43 +47,64 @@ func NewFilter(pattern string) (Filter, error) {
 
 // A FilterCollection contains a bunch of includes and excludes.
 type FilterCollection struct {
-	Includes []Filter
-	Excludes []Filter
+	Includes []string
+	Excludes []string
+
+	match  FilterMatchFunc
+	handle FilterHandleFunc
 }
 
 // NewFilterCollection creates a filter collection from a bunch
 // of filter patterns.
-func NewFilterCollection(patterns []string) (*FilterCollection, error) {
+func NewFilterCollection(filters []Filter, mf FilterMatchFunc, hf FilterHandleFunc) *FilterCollection {
 	collection := &FilterCollection{
-		Includes: []Filter{},
-		Excludes: []Filter{},
+		Includes: []string{},
+		Excludes: []string{},
+		match:    mf,
+		handle:   hf,
 	}
 
-	if len(patterns) == 0 {
-		return collection, nil
+	if len(filters) == 0 {
+		return collection
 	}
 
-	for _, pattern := range patterns {
-		f, err := NewFilter(pattern)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error in '%s' pattern: %v", pattern, err)
-		}
-
-		if f.include {
-			collection.Includes = append(collection.Includes, f)
+	for _, f := range filters {
+		if f.Include {
+			collection.Includes = append(collection.Includes, f.Pattern)
 		} else {
-			collection.Excludes = append(collection.Excludes, f)
+			collection.Excludes = append(collection.Excludes, f.Pattern)
 		}
 	}
 
-	return collection, nil
+	return collection
 }
 
-// match matches the pattern with the path and returns true
-// if the path either starts with (in absolute terms) or
-// matches like the path regex.
-func match(pattern, path string) bool {
+// NewFCFromPatterns creates a filter collection from a list of
+// string format filters, like `+ /path/to/some/dir`.
+func NewFCFromPatterns(patterns []string, mf FilterMatchFunc, hf FilterHandleFunc) (*FilterCollection, error) {
+	filters := []Filter{}
+
+	for _, p := range patterns {
+		f, err := NewFilter(p)
+		if err != nil {
+			return nil, err
+		}
+
+		filters = append(filters, f)
+	}
+
+	return NewFilterCollection(filters, mf, hf), nil
+}
+
+// FilterMatchFunc compares the pattern with the path of
+// the file changed and returns true if the path resembles
+// the given pattern.
+type FilterMatchFunc func(pattern, path string) bool
+
+// StandardFilterMatcher matches the pattern with the path
+// and returns true if the path either starts with
+// (in absolute terms) or matches like the path regex.
+func StandardFilterMatcher(pattern, path string) bool {
 	matched, err := filepath.Match(pattern, path)
 	if err != nil {
 		return false
@@ -111,11 +132,11 @@ func match(pattern, path string) bool {
 
 // HasInclude tells if the collection matches the path with
 // one of its includes.
-func (c *FilterCollection) HasInclude(path string) bool {
+func (fc *FilterCollection) HasInclude(path string) bool {
 	cleanedPath := filepath.Clean(path)
 
-	for _, f := range c.Includes {
-		if match(f.pattern, cleanedPath) {
+	for _, pattern := range fc.Includes {
+		if fc.match(pattern, cleanedPath) {
 			return true
 		}
 	}
@@ -125,14 +146,44 @@ func (c *FilterCollection) HasInclude(path string) bool {
 
 // HasExclude tells if the collection matches the path with
 // one of its excludes.
-func (c *FilterCollection) HasExclude(path string) bool {
+func (fc *FilterCollection) HasExclude(path string) bool {
 	cleanedPath := filepath.Clean(path)
 
-	for _, f := range c.Excludes {
-		if match(f.pattern, cleanedPath) {
+	for _, pattern := range fc.Excludes {
+		if fc.match(pattern, cleanedPath) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// ShouldHandlePath returns the result of the path handler
+// for the filter collection.
+func (fc *FilterCollection) ShouldHandlePath(path string) bool {
+	handlerFunc := fc.handle
+	return handlerFunc(fc, path)
+}
+
+// FilterHandleFunc is a function that checks if for the filter
+// collection, should the path be handled or not, i.e., should
+// the notifier tick for change in path or not.
+type FilterHandleFunc func(fc *FilterCollection, path string) bool
+
+// StandardFilterHandler returns true if the path should be included
+// and returns false if path should not be included in result.
+func StandardFilterHandler(fc *FilterCollection, path string) bool {
+	handle := false
+
+	// If there are no includes, path should be handled unless
+	// it is in the excludes.
+	if len(fc.Includes) == 0 || fc.HasInclude(path) {
+		handle = true
+	}
+
+	if fc.HasExclude(path) {
+		handle = false
+	}
+
+	return handle
 }

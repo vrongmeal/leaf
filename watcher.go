@@ -31,8 +31,11 @@ type Watcher struct {
 }
 
 // NewWatcher returns a watcher from the given options.
-func NewWatcher(root string, exclude, filters []string) (*Watcher, error) {
-	w := &Watcher{}
+func NewWatcher(root string, exclude []string, fc *FilterCollection) (*Watcher, error) {
+	w := &Watcher{
+		fc:  fc,
+		res: make(chan WatchResult),
+	}
 
 	isdir, err := isDir(root)
 	if err != nil {
@@ -40,7 +43,8 @@ func NewWatcher(root string, exclude, filters []string) (*Watcher, error) {
 	}
 
 	if !isdir {
-		return nil, fmt.Errorf("path '%s' is not a directory", root)
+		return nil, fmt.Errorf(
+			"path '%s' is not a directory", root)
 	}
 
 	w.root = filepath.Clean(root)
@@ -63,11 +67,6 @@ func NewWatcher(root string, exclude, filters []string) (*Watcher, error) {
 		}
 
 		w.exclude = append(w.exclude, absPath)
-	}
-
-	w.fc, err = NewFilterCollection(filters)
-	if err != nil {
-		return nil, err
 	}
 
 	w.notifier, err = fsnotify.NewWatcher()
@@ -93,8 +92,6 @@ func NewWatcher(root string, exclude, filters []string) (*Watcher, error) {
 		}
 	}
 
-	w.res = make(chan WatchResult)
-
 	return w, nil
 }
 
@@ -114,16 +111,7 @@ func (w *Watcher) startWatcher(ctx context.Context) {
 		case event := <-w.notifier.Events:
 			if event.Op == fsnotify.Write {
 				file := event.Name
-				handle := false
-				if len(w.fc.Includes) == 0 || w.fc.HasInclude(file) {
-					handle = true
-				}
-
-				if w.fc.HasExclude(file) {
-					handle = false
-				}
-
-				if handle {
+				if w.fc.ShouldHandlePath(file) {
 					w.res <- WatchResult{File: file}
 				}
 			}

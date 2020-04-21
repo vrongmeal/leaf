@@ -238,8 +238,16 @@ func runEngine(conf *leaf.Config) error {
 		ExitOnError: false,
 	})
 
+	fc, err := leaf.NewFCFromPatterns(
+		conf.Filters,
+		leaf.StandardFilterMatcher,
+		leaf.StandardFilterHandler)
+	if err != nil {
+		log.Fatalf("error creating filters: %v", err)
+	}
+
 	watcher, err := leaf.NewWatcher(
-		conf.Root, conf.Exclude, conf.Filters)
+		conf.Root, conf.Exclude, fc)
 	if err != nil {
 		log.Fatalf("error creating watcher: %v", err)
 	}
