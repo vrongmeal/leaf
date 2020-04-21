@@ -1,121 +1,84 @@
-// Package cmd contains the command line application.
+// Package cmd implements the command-line interface for the
+// leaf command. It contains commands and their flags.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/vrongmeal/leaf/pkg/engine"
-	"github.com/vrongmeal/leaf/pkg/types"
-	"github.com/vrongmeal/leaf/pkg/utils"
-	"github.com/vrongmeal/leaf/version"
+	"github.com/vrongmeal/leaf"
 
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+	lpf "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
 	confPath string
-	conf     types.Config
+	debugEnv bool
 
-	rootCmd = &cobra.Command{
-		Use:   "leaf",
-		Short: "General purpose hot-reloader for all projects",
-		Long: `Given a set of commands, leaf watches the filtered paths in the project directory for any changes and runs the commands in
-order so you don't have to yourself`,
-
-		PreRun: func(*cobra.Command, []string) {
-			if confPath != "" {
-				viper.SetConfigFile(confPath)
-			} else {
-				viper.SetConfigFile(utils.DefaultConfPath)
-			}
-
-			viper.AutomaticEnv()
-
-			if err := viper.ReadInConfig(); err != nil {
-				logrus.Warnln("Continuing without config...")
-			}
-
-			if err := viper.Unmarshal(&conf); err != nil {
-				logrus.Fatalf("Cannot unmarshal config: %s", err.Error())
-			}
-
-			// Check and include defaults if required
-			if len(conf.Exclude) == 0 {
-				conf.Exclude = utils.DefaultExcludePaths
-			} else {
-				finalExcludes := []string{}
-				for _, e := range conf.Exclude {
-					if e == utils.DefaultExcludePathsKeyword {
-						finalExcludes = append(finalExcludes, utils.DefaultExcludePaths...)
-						continue
-					}
-
-					finalExcludes = append(finalExcludes, e)
-				}
-
-				conf.Exclude = finalExcludes
-			}
-		},
-
-		Run: func(*cobra.Command, []string) {
-			logrus.Infof("Starting to watch: %s", conf.Root)
-			logrus.Infoln("Excluded paths:")
-			for _, e := range conf.Exclude {
-				logrus.Infof("\t%s", e)
-			}
-
-			if err := engine.Start(&conf); err != nil {
-				logrus.Fatalf("Cannot start leaf: %s", err.Error())
-			}
-		},
-	}
-
-	versionCmd = &cobra.Command{
-		Use:   "version",
-		Short: "Leaf version",
-		Long:  `Leaf version details`,
-
-		Run: func(*cobra.Command, []string) {
-			fmt.Printf(`%s: %s
-Version [%s]
-`, version.AppName, rootCmd.Short, version.Version)
-		},
-	}
+	conf leaf.Config
 )
 
+var rootCmd = &cobra.Command{
+	Use:   "leaf",
+	Short: "general purpose hot-reloader for all projects",
+	Long: `
+Command leaf watches for changes in the working directory and
+runs the specified set of commands whenever a file updates.
+A set of filters can be applied to the watch and directories
+can be excluded.`,
+
+	PersistentPreRun: func(*cobra.Command, []string) {
+		// Logger is initialized depending upon the debug
+		// flag and hence is not in the `init` function.
+		initialiseLogger()
+	},
+
+	PreRun: func(*cobra.Command, []string) {
+		ferr, rerr := setupConfig()
+		if rerr != nil {
+			log.Fatalln(rerr)
+		} else if ferr != nil {
+			log.Warnf("config file not read: %v", ferr)
+		}
+	},
+
+	Run: func(*cobra.Command, []string) {
+		log.Infof("watching '%s'", conf.Root)
+
+		if err := runEngine(&conf); err != nil {
+			log.Fatalln(err)
+		}
+	},
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "prints leaf version",
+	Long: `
+Prints the build information for the leaf commnd line.`,
+
+	Run: func(*cobra.Command, []string) {
+		goModInfo, err := leaf.GoModuleInfo()
+		if err != nil {
+			log.Fatalf("error getting version: %v", err)
+		}
+
+		fmt.Printf("leaf version %s\n", goModInfo.Version)
+	},
+}
+
 func init() {
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.SetFormatter(new(prefixed.TextFormatter))
+	initializeFlags()
 
-	rootCmd.PersistentFlags().StringVarP(&confPath, "config", "c", utils.DefaultConfPath, "Config path for leaf configuration file")
-
-	rootCmd.Flags().StringP("root", "r", utils.CWD, "Root directory to watch")
-	rootCmd.Flags().StringSliceP(
-		"exclude", "e", utils.DefaultExcludePaths,
-		fmt.Sprintf("Paths to exclude. You can append default paths by adding `%s` in your list", utils.DefaultExcludePathsKeyword))
-	rootCmd.Flags().StringSliceP("filters", "f", []string{}, "Filters to apply to watch")
-	rootCmd.Flags().StringSliceP("exec", "x", []string{}, "Exec commands on file change")
-	rootCmd.Flags().DurationP("delay", "d", 500*time.Millisecond, "Delay after which commands are run on file change")
-
-	if err := viper.BindPFlag("root", rootCmd.Flags().Lookup("root")); err != nil {
-		logrus.Fatalf("Error binding flag to viper: %s", err.Error())
-	}
-	if err := viper.BindPFlag("exclude", rootCmd.Flags().Lookup("exclude")); err != nil {
-		logrus.Fatalf("Error binding flag to viper: %s", err.Error())
-	}
-	if err := viper.BindPFlag("filters", rootCmd.Flags().Lookup("filters")); err != nil {
-		logrus.Fatalf("Error binding flag to viper: %s", err.Error())
-	}
-	if err := viper.BindPFlag("exec", rootCmd.Flags().Lookup("exec")); err != nil {
-		logrus.Fatalf("Error binding flag to viper: %s", err.Error())
-	}
-	if err := viper.BindPFlag("delay", rootCmd.Flags().Lookup("delay")); err != nil {
-		logrus.Fatalf("Error binding flag to viper: %s", err.Error())
+	if err := bindFlagsToConfig(); err != nil {
+		log.Fatalf("cannot bind flags with config: %v", err)
 	}
 
 	rootCmd.AddCommand(versionCmd)
@@ -124,6 +87,184 @@ func init() {
 // Execute starts the command line tool.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		logrus.Fatalf("Cannot start leaf: %s", err.Error())
+		log.Fatalln(err)
 	}
+}
+
+// initialiseLogger sets up the logger configuration.
+func initialiseLogger() {
+	if debugEnv {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
+	log.SetFormatter(&lpf.TextFormatter{
+		DisableTimestamp: true,
+	})
+}
+
+// initializeFlags sets the initializes flags for the commands.
+func initializeFlags() {
+	rootCmd.PersistentFlags().BoolVar(
+		&debugEnv, "debug", false,
+		"run in development (debug) environment")
+
+	rootCmd.PersistentFlags().StringVarP(
+		&confPath, "config", "c", leaf.DefaultConfPath,
+		"config path for the configuration file")
+
+	rootCmd.Flags().StringP(
+		"root", "r", leaf.CWD,
+		"root directory to watch")
+
+	rootCmd.Flags().StringSliceP(
+		"exclude", "e", leaf.DefaultExcludePaths,
+		"paths to exclude from watching")
+
+	rootCmd.Flags().StringSliceP(
+		"filters", "f", []string{},
+		"filters to apply to watch")
+
+	rootCmd.Flags().StringSliceP(
+		"exec", "x", []string{},
+		"exec commands on file change")
+
+	rootCmd.Flags().DurationP(
+		"delay", "d", 500*time.Millisecond,
+		"delay after which commands are run on file change")
+}
+
+// bindFlagsToConfig binds the flags with viper config file.
+func bindFlagsToConfig() error {
+	keyFlagMap := map[string]string{
+		"root":    "root",
+		"exclude": "exclude",
+		"filters": "filters",
+		"exec":    "exec",
+		"delay":   "delay",
+	}
+
+	for key, flag := range keyFlagMap {
+		err := viper.BindPFlag(key, rootCmd.Flags().Lookup(flag))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// setupConfig reads and unmarshals the config file into
+// the `conf` variable.
+func setupConfig() (fileErr, readErr error) {
+	if confPath != "" {
+		viper.SetConfigFile(confPath)
+	} else {
+		viper.SetConfigFile(leaf.DefaultConfPath)
+	}
+
+	viper.AutomaticEnv()
+
+	var confFileErr error
+	if err := viper.ReadInConfig(); err != nil {
+		// Even if no config is provided we still unmarshal
+		// the config because are flags are bound with conf.
+		confFileErr = err
+	}
+
+	if err := viper.Unmarshal(&conf); err != nil {
+		return confFileErr, fmt.Errorf("unable to read config: %v", err)
+	}
+
+	// By default the defaults are included in the excludes.
+	// If the excludes are specified explicitly, defaults will
+	// only be included if the `DEFAULTS` keyword is in the
+	// excluded paths.
+	if len(conf.Exclude) == 0 {
+		conf.Exclude = leaf.DefaultExcludePaths
+	} else {
+		finalExcludes := []string{}
+		for _, e := range conf.Exclude {
+			if e == leaf.DefaultExcludePathsKeyword {
+				finalExcludes = append(finalExcludes,
+					leaf.DefaultExcludePaths...)
+				continue
+			}
+
+			finalExcludes = append(finalExcludes, e)
+		}
+
+		conf.Exclude = finalExcludes
+	}
+
+	return confFileErr, nil
+}
+
+// newCmdContext returns a context which cancels on an OS
+// interrupt, i.e., cancels when process is killed.
+func newCmdContext(onInterrupt func(os.Signal)) context.Context {
+	interrupt := make(chan os.Signal)
+	signal.Notify(interrupt, os.Interrupt)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func(onSignal func(os.Signal), cancelProcess context.CancelFunc) {
+		sig := <-interrupt
+		onSignal(sig)
+		cancelProcess()
+	}(onInterrupt, cancel)
+
+	return ctx
+}
+
+// runEngine runs the watcher and executes the commands from
+// the config on file change.
+func runEngine(conf *leaf.Config) error {
+	ctx := newCmdContext(func(s os.Signal) {
+		log.Infof("closing: signal received: %s", s.String())
+	})
+
+	commander := leaf.NewCommander(leaf.Commander{
+		Commands: conf.Exec,
+		OnStart: func(cmd *leaf.Command) {
+			log.Infof("running: %s", cmd.String())
+		},
+		OnError: func(err error) {
+			log.Errorln(err)
+		},
+		OnExit: func() {
+			log.Info("commands executed")
+		},
+		ExitOnError: false,
+	})
+
+	watcher, err := leaf.NewWatcher(
+		conf.Root, conf.Exclude, conf.Filters)
+	if err != nil {
+		log.Fatalf("error creating watcher: %v", err)
+	}
+
+	cmdCtx, killCmds := context.WithCancel(ctx)
+	go commander.Run(cmdCtx)
+
+	for wr := range watcher.Watch(ctx) {
+		if wr.Err != nil {
+			log.Errorf("error while watching: %v", err)
+			continue
+		}
+
+		log.Infof("file '%s' changed, reloading...", wr.File)
+
+		killCmds()                                 // kill previous commands
+		cmdCtx, killCmds = context.WithCancel(ctx) // new context
+		time.Sleep(conf.Delay)                     // wait for 'delay' duration
+		<-commander.Done()                         // wait more if required by commands
+		go commander.Run(cmdCtx)                   // run commands
+	}
+
+	killCmds()
+	<-commander.Done()
+
+	log.Infoln("shutdown successfully")
+	return nil
 }

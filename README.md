@@ -2,6 +2,11 @@
 
 > General purpose hot-reloader for all projects.
 
+Command leaf watches for changes in the working directory
+and runs the specified set of commands whenever a file
+updates. A set of filters can be applied to the watch and
+directories can be excluded.
+
 ## Contents
 
 1. [Installation](#installation)
@@ -11,7 +16,6 @@
 1. [Usage](#usage)
     1. [Command line help](#command-line-help)
     1. [Configuration file](#configuration-file)
-    1. [Configuring using cmd](#configuring-using-cmd)
 
 ## Installation
 
@@ -19,20 +23,19 @@
 
 You can use my homebrew tap to install Leaf.
 
-```console
-> brew tap vrongmeal/tap
-> brew install vrongmeal/tap/leaf
+```
+❯ brew tap vrongmeal/tap
+❯ brew install vrongmeal/tap/leaf
 ```
 
 ### Using `go get`
 
-The following command will download and build Leaf in your `$GOPATH/bin`.
+The following command will download and build Leaf in your
+`$GOPATH/bin`.
 
-```console
-> go get -u github.com/vrongmeal/leaf
 ```
-
-**Note:** This does not build the `version` command. To build that use [homebrew](#homebrew) or [manual](#manual) installation.
+❯ go get -u github.com/vrongmeal/leaf/cmd/leaf
+```
 
 ### Manual
 
@@ -42,36 +45,53 @@ The following command will download and build Leaf in your `$GOPATH/bin`.
 
 ## Usage
 
+```
+$ leaf -x 'make build' -x 'make run'
+```
+
+The above command runs `make build` and `make run` commands
+(in order).
+
 ### Command line help
 
-```console
-> leaf --help
-Given a set of commands, leaf watches the filtered paths in the project directory for any changes and runs the commands in
-order so you don't have to yourself
+The CLI can be used as described by the help message:
+
+```
+❯ leaf help
+
+Command leaf watches for changes in the working directory and
+runs the specified set of commands whenever a file updates.
+A set of filters can be applied to the watch and directories
+can be excluded.
 
 Usage:
-  leaf [flags]
-  leaf [command]
+leaf [flags]
+leaf [command]
 
 Available Commands:
-  help        Help about any command
-  version     Leaf version
+help        Help about any command
+version     prints leaf version
 
 Flags:
-  -c, --config string      Config path for leaf configuration file (default "<CWD>/.leaf.yml")
-  -d, --delay duration     Delay after which commands are run on file change (default 500ms)
-  -e, --exclude DEFAULTS   Paths to exclude. You can append default paths by adding DEFAULTS in your list (default [.git/,node_modules/,vendor/,venv/])
-  -x, --exec strings       Exec commands on file change
-  -f, --filters strings    Filters to apply to watch
-  -h, --help               help for leaf
-  -r, --root string        Root directory to watch (default "<CWD>")
+-c, --config string     config path for the configuration file (default "<CWD>/.leaf.yml")
+    --debug             run in development (debug) environment
+-d, --delay duration    delay after which commands are run on file change (default 500ms)
+-e, --exclude strings   paths to exclude from watching (default [.git/,node_modules/,vendor/,venv/])
+-x, --exec strings      exec commands on file change
+-f, --filters strings   filters to apply to watch
+-h, --help              help for leaf
+-r, --root string       root directory to watch (default "<CWD>")
 
 Use "leaf [command] --help" for more information about a command.
 ```
 
 ### Configuration file
 
-This project doesn't really require a hot-reload but a sample hot-reload for this project would look like [this](_examples/sample.leaf.yml):
+In order to configure using a configuration file, create a
+YAML or TOML or even a JSON file with the following structure
+and pass it using the `-c` or `--config` flag. By default
+a file named `.leaf.yml` in your working directory is taken
+if no configuration file is found.
 
 ```yaml
 # Leaf configuration file.
@@ -81,29 +101,25 @@ This project doesn't really require a hot-reload but a sample hot-reload for thi
 root: .
 
 # Exclude directories while watching.
-# If certain directories are not excluded, it might reach a limitation where watcher doesn't start.
+# If certain directories are not excluded, it might reach a
+# limitation where watcher doesn't start.
 exclude:
   - DEFAULTS # This includes the default ignored directories
   - build/
+  - scripts/
 
 # Filters to apply on the watch.
-# Filters starting with '+' are includent and then with '-' are excluded.
-# This is not like exclude, these are still being watched yet can be excluded from the execution.
-# These can include any filepath regex supported by "filepath".Match method or even a directory.
+# Filters starting with '+' are includent and then with '-'
+# are excluded. This is not like exclude, these are still
+# being watched yet can be excluded from the execution.
+# These can include any regex supported by filepath.Match
+# method or even a directory.
 filters:
-  # The following can be simplified by also doing an include filter:
-  # ['+cmd/', '+pkg/', '+scripts/']
-  # This example is just to show that expressions are supported.
-  - -.git*
-  - -.go*
-  - -.golangci.yml
-  - -go.*
-  - -Makefile
-  - -LICENSE
-  - -README.md
+  - '+ go.*'
+  - '+ *.go'
+  - '+ cmd/'
 
-# Commands to be executed.
-# These are run in the provided order.
+# Commands to be executed. These are run in the provided order.
 exec:
   - make build
 
@@ -111,23 +127,14 @@ exec:
 delay: 1s
 ```
 
-By default the config path is taken as `<current working directory>/.leaf.yml` which you can change using the `--config` or `-c` flag. You can also use a JSON or TOML file.
+The above config file is suitable to use with the current
+project itself. It can also be translated into a command
+as such:
 
-## Configuring using cmd
-
-You can also configure using command line. The above config can be run as follows:
-
-```console
-> leaf -d=1s -e=DEFAULTS -e='build/' -f='+cmd/' -f='+pkg/' -f='+scripts/' -x='make build'
-[0000]  WARN Continuing without config...
-[0000]  INFO Starting to watch: /Users/vrongmeal/Projects/vrongmeal/leaf
-[0000]  INFO Excluded paths:
-[0000]  INFO  .git/
-[0000]  INFO  node_modules/
-[0000]  INFO  vendor/
-[0000]  INFO  venv/
-[0000]  INFO  build/
-...
+```
+❯ leaf -x 'make build' -d '1s' \
+  -e 'DEFAULTS' -e 'build' -e 'scripts' \
+  -f '+ go.*' -f '+ *.go' -f '+ cmd/'
 ```
 
 ---

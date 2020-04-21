@@ -1,0 +1,32 @@
+# Leaf configuration file.
+
+# Root directory to watch.
+# Defaults to current working directory.
+root: .
+
+# Exclude directories while watching.
+# If certain directories are not excluded, it might reach a
+# limitation where watcher doesn't start.
+exclude:
+  - DEFAULTS # This includes the default ignored directories
+  - build/
+  - scripts/
+
+# Filters to apply on the watch.
+# Filters starting with '+' are includent and then with '-'
+# are excluded. This is not like exclude, these are still
+# being watched yet can be excluded from the execution.
+# These can include any regex supported by filepath.Match
+# method or even a directory.
+filters:
+  - '+ go.mod'
+  - '+ go.sum'
+  - '+ *.go'
+  - '+ cmd/'
+
+# Commands to be executed. These are run in the provided order.
+exec:
+  - make build
+
+# Delay after which commands are executed.
+delay: 1s
