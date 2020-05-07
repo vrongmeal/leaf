@@ -2,11 +2,84 @@
 // CLI tool. It includes watcher, filters and commander which
 // watch files for changes, filter out required results and
 // execute external commands respectively.
+//
+// The package comes with utilities that can aid in creating
+// a hot-reloader with a simple go program.
+//
+// Let's look at an example where the watcher watches the `src/`
+// directory for changes and for any changes builds the project.
+//
+// 	package main
+//
+// 	import (
+// 		"log"
+// 		"os"
+// 		"path/filepath"
+//
+// 		"github.com/vrongmeal/leaf"
+// 	)
+//
+// 	func main() {
+// 		// Use a context that cancels when program is interrupted.
+// 		ctx := leaf.NewCmdContext(func(os.Signal) {
+// 			log.Println("Shutting down.")
+// 		})
+//
+// 		cwd, err := os.Getwd()
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 		}
+//
+// 		// Root is <cwd>/src
+// 		root := filepath.Join(cwd, "src")
+//
+// 		// Exclude "src/index.html" from results.
+// 		filters := []leaf.Filter{
+// 			{Include: false, Pattern: "src/index.html"},
+// 		}
+//
+// 		filterCollection := leaf.NewFilterCollection(
+// 			filters,
+// 			// Matches directory or filepath.Match expressions
+// 			leaf.StandardFilterMatcher,
+// 			// Definitely excludes and shows only includes (if any)
+// 			leaf.StandardFilterHandler)
+//
+// 		watcher, err := leaf.NewWatcher(
+// 			root,
+// 			// Standard paths to exclude, like vendor, .git,
+// 			// node_modules, venv etc.
+// 			leaf.DefaultExcludePaths,
+// 			filterCollection)
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 		}
+//
+// 		cmd, err := leaf.NewCommand("npm run build")
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 		}
+//
+// 		log.Printf("Watching: %s\n", root)
+//
+// 		for change := range watcher.Watch(ctx) {
+// 			if change.Err != nil {
+// 				log.Printf("ERROR: %v", change.Err)
+// 				continue
+// 			}
+// 			// If no error run the command
+// 			log.Printf("Running: %s\n", cmd.String())
+// 			cmd.Execute(ctx)
+// 		}
+// 	}
+//
 package leaf
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/debug"
 	"time"
@@ -63,6 +136,22 @@ type Config struct {
 
 	// Delay after which commands should be executed.
 	Delay time.Duration `mapstructure:"delay"`
+}
+
+// NewCmdContext returns a context which cancels on an OS
+// interrupt, i.e., cancels when process is killed.
+func NewCmdContext(onInterrupt func(os.Signal)) context.Context {
+	interrupt := make(chan os.Signal)
+	signal.Notify(interrupt, os.Interrupt)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func(onSignal func(os.Signal), cancelProcess context.CancelFunc) {
+		sig := <-interrupt
+		onSignal(sig)
+		cancelProcess()
+	}(onInterrupt, cancel)
+
+	return ctx
 }
 
 // GoModuleInfo returns the go module information which

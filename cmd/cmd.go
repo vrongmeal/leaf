@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -201,26 +200,10 @@ func setupConfig() (fileErr, readErr error) {
 	return confFileErr, nil
 }
 
-// newCmdContext returns a context which cancels on an OS
-// interrupt, i.e., cancels when process is killed.
-func newCmdContext(onInterrupt func(os.Signal)) context.Context {
-	interrupt := make(chan os.Signal)
-	signal.Notify(interrupt, os.Interrupt)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func(onSignal func(os.Signal), cancelProcess context.CancelFunc) {
-		sig := <-interrupt
-		onSignal(sig)
-		cancelProcess()
-	}(onInterrupt, cancel)
-
-	return ctx
-}
-
 // runEngine runs the watcher and executes the commands from
 // the config on file change.
 func runEngine(conf *leaf.Config) error {
-	ctx := newCmdContext(func(s os.Signal) {
+	ctx := leaf.NewCmdContext(func(s os.Signal) {
 		log.Infof("closing: signal received: %s", s.String())
 	})
 

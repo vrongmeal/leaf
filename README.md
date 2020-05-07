@@ -16,6 +16,7 @@ directories can be excluded.
 1. [Usage](#usage)
     1. [Command line help](#command-line-help)
     1. [Configuration file](#configuration-file)
+1. [Custom hot reloader](#custom-hot-reloader)
 
 ## Installation
 
@@ -46,7 +47,7 @@ The following command will download and build Leaf in your
 ## Usage
 
 ```
-$ leaf -x 'make build' -x 'make run'
+❯ leaf -x 'make build' -x 'make run'
 ```
 
 The above command runs `make build` and `make run` commands
@@ -135,6 +136,82 @@ as such:
 ❯ leaf -x 'make build' -d '1s' \
   -e 'DEFAULTS' -e 'build' -e 'scripts' \
   -f '+ go.*' -f '+ *.go' -f '+ cmd/'
+```
+
+## Custom hot reloader
+
+The package [github.com/vrongmeal/leaf](https://pkg.go.dev/github.com/vrongmeal/leaf)
+comes with utilities that can aid in creating a hot-reloader
+with a simple go program.
+
+Let's look at an example where the watcher watches the `src/`
+directory for changes and for any changes builds the project.
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/vrongmeal/leaf"
+)
+
+func main() {
+	// Use a context that cancels when program is interrupted.
+	ctx := leaf.NewCmdContext(func(os.Signal) {
+		log.Println("Shutting down.")
+	})
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Root is <cwd>/src
+	root := filepath.Join(cwd, "src")
+
+	// Exclude "src/index.html" from results.
+	filters := []leaf.Filter{
+		{Include: false, Pattern: "src/index.html"},
+	}
+
+	filterCollection := leaf.NewFilterCollection(
+		filters,
+		// Matches directory or filepath.Match expressions
+		leaf.StandardFilterMatcher,
+		// Definitely excludes and shows only includes (if any)
+		leaf.StandardFilterHandler)
+
+	watcher, err := leaf.NewWatcher(
+		root,
+		// Standard paths to exclude, like vendor, .git,
+		// node_modules, venv etc.
+		leaf.DefaultExcludePaths,
+		filterCollection)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	cmd, err := leaf.NewCommand("npm run build")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Printf("Watching: %s\n", root)
+
+	for change := range watcher.Watch(ctx) {
+		if change.Err != nil {
+			log.Printf("ERROR: %v", change.Err)
+			continue
+		}
+		// If no error run the command
+		fmt.Printf("Running: %s\n", cmd.String())
+		cmd.Execute(ctx)
+	}
+}
 ```
 
 ---
