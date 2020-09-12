@@ -20,15 +20,6 @@ directories can be excluded.
 
 ## Installation
 
-### Homebrew
-
-You can use my homebrew tap to install Leaf.
-
-```
-❯ brew tap vrongmeal/tap
-❯ brew install vrongmeal/tap/leaf
-```
-
 ### Using `go get`
 
 The following command will download and build Leaf in your
