@@ -26,7 +26,11 @@ filters:
 
 # Commands to be executed. These are run in the provided order.
 exec:
+  - make format
   - make build
+
+# Stop the command chain when an error occurs
+exit_on_err: true
 
 # Delay after which commands are executed.
 delay: 1s

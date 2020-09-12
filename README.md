@@ -66,22 +66,24 @@ A set of filters can be applied to the watch and directories
 can be excluded.
 
 Usage:
-leaf [flags]
-leaf [command]
+  leaf [flags]
+  leaf [command]
 
 Available Commands:
-help        Help about any command
-version     prints leaf version
+  help        Help about any command
+  version     prints leaf version
 
 Flags:
--c, --config string     config path for the configuration file (default "<CWD>/.leaf.yml")
-    --debug             run in development (debug) environment
--d, --delay duration    delay after which commands are run on file change (default 500ms)
--e, --exclude strings   paths to exclude from watching (default [.git/,node_modules/,vendor/,venv/])
--x, --exec strings      exec commands on file change
--f, --filters strings   filters to apply to watch
--h, --help              help for leaf
--r, --root string       root directory to watch (default "<CWD>")
+  -c, --config string     config path for the configuration file (default "<CWD>/.leaf.yml")
+      --debug             run in development (debug) environment
+  -d, --delay duration    delay after which commands are run on file change (default 500ms)
+  -e, --exclude strings   paths to exclude from watching (default [.git/,node_modules/,vendor/,venv/])
+  -x, --exec strings      exec commands on file change
+  -z, --exit-on-err       exit chain of commands on error
+  -f, --filters strings   filters to apply to watch
+  -h, --help              help for leaf
+  -o, --once              run once and exit (no reload)
+  -r, --root string       root directory to watch (default "<CWD>")
 
 Use "leaf [command] --help" for more information about a command.
 ```
@@ -116,13 +118,18 @@ exclude:
 # These can include any regex supported by filepath.Match
 # method or even a directory.
 filters:
-  - '+ go.*'
+  - '+ go.mod'
+  - '+ go.sum'
   - '+ *.go'
   - '+ cmd/'
 
 # Commands to be executed. These are run in the provided order.
 exec:
+  - make format
   - make build
+
+# Stop the command chain when an error occurs
+exit_on_err: true
 
 # Delay after which commands are executed.
 delay: 1s
@@ -133,7 +140,7 @@ project itself. It can also be translated into a command
 as such:
 
 ```
-❯ leaf -x 'make build' -d '1s' \
+❯ leaf -z -x 'make format' -x 'make build' -d '1s' \
   -e 'DEFAULTS' -e 'build' -e 'scripts' \
   -f '+ go.*' -f '+ *.go' -f '+ cmd/'
 ```

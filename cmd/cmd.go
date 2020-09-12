@@ -18,8 +18,10 @@ import (
 )
 
 var (
-	confPath string
-	debugEnv bool
+	confPath  string
+	debugEnv  bool
+	once      bool
+	exitOnErr bool
 
 	conf leaf.Config
 )
@@ -113,6 +115,10 @@ func initializeFlags() {
 		&confPath, "config", "c", leaf.DefaultConfPath,
 		"config path for the configuration file")
 
+	rootCmd.PersistentFlags().BoolVarP(
+		&once, "once", "o", false,
+		"run once and exit (no reload)")
+
 	rootCmd.Flags().StringP(
 		"root", "r", leaf.CWD,
 		"root directory to watch")
@@ -129,6 +135,10 @@ func initializeFlags() {
 		"exec", "x", []string{},
 		"exec commands on file change")
 
+	rootCmd.Flags().BoolP(
+		"exit-on-err", "z", false,
+		"exit chain of commands on error")
+
 	rootCmd.Flags().DurationP(
 		"delay", "d", 500*time.Millisecond,
 		"delay after which commands are run on file change")
@@ -137,11 +147,12 @@ func initializeFlags() {
 // bindFlagsToConfig binds the flags with viper config file.
 func bindFlagsToConfig() error {
 	keyFlagMap := map[string]string{
-		"root":    "root",
-		"exclude": "exclude",
-		"filters": "filters",
-		"exec":    "exec",
-		"delay":   "delay",
+		"root":        "root",
+		"exclude":     "exclude",
+		"filters":     "filters",
+		"exec":        "exec",
+		"exit_on_err": "exit-on-err",
+		"delay":       "delay",
 	}
 
 	for key, flag := range keyFlagMap {
@@ -218,7 +229,7 @@ func runEngine(conf *leaf.Config) error {
 		OnExit: func() {
 			log.Info("commands executed")
 		},
-		ExitOnError: false,
+		ExitOnError: conf.ExitOnErr,
 	})
 
 	fc, err := leaf.NewFCFromPatterns(
@@ -238,22 +249,25 @@ func runEngine(conf *leaf.Config) error {
 	cmdCtx, killCmds := context.WithCancel(ctx)
 	go commander.Run(cmdCtx)
 
-	for wr := range watcher.Watch(ctx) {
-		if wr.Err != nil {
-			log.Errorf("error while watching: %v", err)
-			continue
+	if !once {
+		for wr := range watcher.Watch(ctx) {
+			if wr.Err != nil {
+				log.Errorf("error while watching: %v", err)
+				continue
+			}
+
+			log.Infof("file '%s' changed, reloading...", wr.File)
+
+			killCmds()                                 // kill previous commands
+			cmdCtx, killCmds = context.WithCancel(ctx) // new context
+			time.Sleep(conf.Delay)                     // wait for 'delay' duration
+			<-commander.Done()                         // wait more if required by commands
+			go commander.Run(cmdCtx)                   // run commands
 		}
 
-		log.Infof("file '%s' changed, reloading...", wr.File)
-
-		killCmds()                                 // kill previous commands
-		cmdCtx, killCmds = context.WithCancel(ctx) // new context
-		time.Sleep(conf.Delay)                     // wait for 'delay' duration
-		<-commander.Done()                         // wait more if required by commands
-		go commander.Run(cmdCtx)                   // run commands
+		killCmds()
 	}
 
-	killCmds()
 	<-commander.Done()
 
 	log.Infoln("shutdown successfully")

@@ -134,6 +134,9 @@ type Config struct {
 	// Exec these commads after changes detected.
 	Exec []string `mapstructure:"exec"`
 
+	// ExitOnErr breaks the chain of command if any command returnns an error.
+	ExitOnErr bool `mapstructure:"exit_on_err"`
+
 	// Delay after which commands should be executed.
 	Delay time.Duration `mapstructure:"delay"`
 }
