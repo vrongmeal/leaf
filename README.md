@@ -2,6 +2,8 @@
 
 > General purpose hot-reloader for all projects.
 
+![Continuous Integration](https://github.com/vrongmeal/leaf/workflows/Continuous%20Integration/badge.svg)
+
 Command leaf watches for changes in the working directory
 and runs the specified set of commands whenever a file
 updates. A set of filters can be applied to the watch and
@@ -10,7 +12,6 @@ directories can be excluded.
 ## Contents
 
 1. [Installation](#installation)
-    1. [Homebrew](#homebrew)
     1. [Using `go get`](#using-go-get)
     1. [Manual](#manual)
 1. [Usage](#usage)
