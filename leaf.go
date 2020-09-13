@@ -4,7 +4,7 @@
 // execute external commands respectively.
 //
 // The package comes with utilities that can aid in creating
-// a hot-reloader with a simple go program.
+// a reloader with a simple go program.
 //
 // Let's look at an example where the watcher watches the `src/`
 // directory for changes and for any changes builds the project.
