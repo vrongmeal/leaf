@@ -1,0 +1,62 @@
+# Root directory of the project.
+# Default is current working directory.
+root: .
+
+# Exclude these directories from being watched. Follows .gitignore syntax.
+# These are usually large directories like node_modules where the watcher
+# reaches a limit and doesn't start.
+# By default the following are excluded. To include them forcefully, use
+# the "!" syntax.
+# - .git/
+# - node_modules/
+# - vendor/
+# - venv/
+ignore:
+- '!docs/vendor/'
+
+# All various jobs for project are defined in this section.
+# Each job can be configured with filters.
+jobs:
+  # Configuration of example job.
+  # This job can be accessed by CLI using --job flag.
+  example:
+    # These patterns are matched. This also uses the .gitignore syntax.
+    match:
+    - '**/*.go'       # Reload on all go files.
+    - '!**/*_test.go' # Except test files.
+
+    # Defines the commands to be run:
+    # Each command can be run synchronously or async. They run in given order.
+    # Irrespective of sync or async, when the pattern matches, the processes
+    # are cancelled properly before beginning again.
+    exec:
+    - cmd: ['make', 'build']
+      async: false
+      log: 'Building only go files'      # Something to log from in-built logger.
+    # Variables are supported in commands:
+    # - path: full path of the file (/cmd/leaf/main.go)
+    # - file: name of the file (main.go)
+    # - dir: directory of the file (/cmd/leaf)
+    # - name: name of the file without extension (main)
+    # - ext: extension of the file (go)
+    # - dirname: directory name without the path (leaf)
+    - cmd: ['go', 'run', 'PATH=${path}']
+      async: true
+
+    # What to do in case a command exits or runs with an error.
+    # Valid options are:
+    # - continue (Default): Irrespective of anything keep running in order.
+    # - break: Stop the flow of commands for current run.
+    # - exit: exits leaf with non-zero exit code.
+    onerror: continue
+
+    # Children jobs. These are also executed after this job is done.
+    children:
+    - another_example
+
+  another_example:
+    match:
+    - '**/*_test.go'
+
+    exec:
+    - cmd: ['make', 'test']
