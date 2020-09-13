@@ -1,6 +1,6 @@
 # leaf
 
-> General purpose hot-reloader for all projects.
+> General purpose reloader for all projects.
 
 ![Continuous Integration](https://github.com/vrongmeal/leaf/workflows/Continuous%20Integration/badge.svg)
 
@@ -17,7 +17,7 @@ directories can be excluded.
 1. [Usage](#usage)
     1. [Command line help](#command-line-help)
     1. [Configuration file](#configuration-file)
-1. [Custom hot reloader](#custom-hot-reloader)
+1. [Custom reloader](#custom-reloader)
 
 ## Installation
 
@@ -137,10 +137,10 @@ as such:
   -f '+ go.*' -f '+ *.go' -f '+ cmd/'
 ```
 
-## Custom hot reloader
+## Custom reloader
 
 The package [github.com/vrongmeal/leaf](https://pkg.go.dev/github.com/vrongmeal/leaf)
-comes with utilities that can aid in creating a hot-reloader
+comes with utilities that can aid in creating a reloader
 with a simple go program.
 
 Let's look at an example where the watcher watches the `src/`
