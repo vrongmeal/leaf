@@ -7,20 +7,24 @@ GOPATH := $(shell go env GOPATH)
 GOPATH_BIN := $(GOPATH)/bin
 GOLANGCI_LINT := $(GOPATH_BIN)/golangci-lint
 BUILD_OUTPUT := ./target/leaf
-BUILD_INPUT := cmd/leaf/main.go
+BUILD_INPUT := ./cmd/leaf
 GO_PACKAGES := $(shell go list ./... | grep -v vendor)
+GIT_BRANCH := $(shell git describe --tags --exact-match 2> /dev/null \
+  || git symbolic-ref -q --short HEAD \
+  || git rev-parse --short HEAD)
+BUILD_PACKAGE := $(shell go list ./... | grep '/build')
 
 build:
 	@echo "Building..."
 	@test -d target || mkdir target
-	@$(GO) build -o $(BUILD_OUTPUT) $(BUILD_INPUT)
+	@$(GO) build -ldflags="-X '$(BUILD_PACKAGE).Version=$(GIT_BRANCH)'" -o $(BUILD_OUTPUT) $(BUILD_INPUT)
 	@echo "Built as $(BUILD_OUTPUT)"
 
 devtools:
 	@echo "Installing golangci-lint..."
 	@curl -sSfL \
-	 	https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-	 	sh -s -- -b $(GOPATH_BIN) v1.24.0
+		https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		sh -s -- -b $(GOPATH_BIN) v1.24.0
 	@echo "Installed successfully"
 
 format:

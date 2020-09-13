@@ -4,6 +4,7 @@ run:
 linters-settings:
   lll:
     line-length: 120
+    tab-width: 2
 
 linters:
   disable-all: true
