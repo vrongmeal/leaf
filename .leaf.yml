@@ -60,3 +60,7 @@ jobs:
 
     exec:
     - cmd: ['make', 'test']
+
+# Runs the jobs in following order on start.
+start:
+- example # another_example will run consequently as it is a child.
