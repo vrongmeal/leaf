@@ -40,7 +40,7 @@ jobs:
     # - name: name of the file without extension (main)
     # - ext: extension of the file (go)
     # - dirname: directory name without the path (leaf)
-    - cmd: ['go', 'run', 'PATH=${path}']
+    - cmd: ['go', 'run', '${path}']
       async: true
 
     # What to do in case a command exits or runs with an error.

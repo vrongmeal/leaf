@@ -7,4 +7,5 @@ indent_style = space
 
 [{*.go,Makefile,go.mod,go.sum}]
 # Tabs should be of size 4
+indent_size = 4
 indent_style = tab
